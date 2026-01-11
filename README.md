@@ -1,43 +1,31 @@
+
 # 💬📹 Real-Time Chat & Video Call Application
 
-A real-time messaging and video calling application built with **React**, **Redux Toolkit**, **WebSocket**, and **WebRTC**.  
-The project demonstrates a clean separation of concerns between UI, application state, and low-level real-time communication logic.
+A real-time messaging and video calling application built with **React**, **Redux Toolkit**, **WebSocket**, and **WebRTC**. The project demonstrates a clean separation of concerns between UI, application state, and low-level real-time communication logic.
 
 ---
 
 ## ✨ Features
 
-- 💬 **Real-time chat**
-  - One-to-one messaging
-  - Unread message tracking
-  - Chat history loading & deletion
-- 📹 **Video & audio calls (WebRTC)**
-  - Incoming / outgoing calls
-  - Call accept / reject flow
-  - ICE candidate buffering
-  - TURN / STUN support
-- 🔁 **Robust state management**
-  - Redux-based call state machine
-  - Deterministic call lifecycle
-- 🧠 **Safe WebRTC lifecycle**
-  - Race-condition protection
-  - Idempotent cleanup
-  - Defensive signaling handling
+- 💬 **Real-time chat**: one-to-one messaging, unread message tracking, chat history loading & deletion  
+- 📹 **Video & audio calls (WebRTC)**: incoming/outgoing calls, call accept/reject flow, ICE candidate buffering, TURN/STUN support  
+- 🔁 **Robust state management**: Redux-based call state machine, deterministic call lifecycle  
+- 🧠 **Safe WebRTC lifecycle**: race-condition protection, idempotent cleanup, defensive signaling handling
 
 ---
 
 ## 🏗️ Architecture Overview
 
-The project is intentionally split into **three independent layers**:
+The project is split into **three independent layers**:
 
-```
 UI (React Components)
 ↓
 Application State (Redux)
 ↓
 Transport / Media Layer (WebRTC + WebSocket)
-```
 
+yaml
+Copy code
 
 Each layer has a single responsibility and does **not leak concerns** into the others.
 
@@ -45,10 +33,10 @@ Each layer has a single responsibility and does **not leak concerns** into the o
 
 ## 🧩 Core Technologies
 
-- **React** — UI rendering & hooks
-- **Redux Toolkit** — global state & call state machine
-- **WebSocket** — signaling & chat transport
-- **WebRTC** — peer-to-peer media (video/audio)
+- **React** — UI rendering & hooks  
+- **Redux Toolkit** — global state & call state machine  
+- **WebSocket** — signaling & chat transport  
+- **WebRTC** — peer-to-peer media (video/audio)  
 - **STUN / TURN** — NAT traversal
 
 ---
@@ -60,16 +48,14 @@ Call flow is modeled as a **finite state machine** inside Redux.
 ### Call States
 
 ```ts
-idle       // no active call
-ringing    // incoming call, waiting for user action
-calling    // outgoing call initiated
-in_call    // WebRTC connection established
+// idle       // no active call
+// ringing    // incoming call, waiting for user action
+// calling    // outgoing call initiated
+// in_call    // WebRTC connection established
 
-
-```
 idle
  ├── incomingOffer → ringing
- └── outgoingCall  → calling
+ └── outgoingCall → calling
 
 ringing
  ├── acceptCall → in_call
@@ -81,166 +67,59 @@ calling
 
 in_call
  └── localEnd / remoteEnd / disconnect → idle
+
+Redux is the single source of truth for: UI rendering, button availability, modal visibility, call permissions.
 ```
 
-Redux is the single source of truth for:
-
-UI rendering
-
-Button availability
-
-Modal visibility
-
-Call permissions
-
-🔌 WebRTC Layer (useWebRTC)
-
-The useWebRTC hook is a low-level transport layer responsible only for:
-
-PeerConnection lifecycle
-
-Media stream handling
-
-SDP (offer / answer)
-
-ICE candidate buffering
-
-WebRTC connection state
+## 🔌 WebRTC Layer (useWebRTC)
+The useWebRTC hook is a low-level transport layer responsible only for: peer connection lifecycle, media stream handling, SDP (offer/answer), ICE candidate buffering, WebRTC connection state.
 
 Important Design Rules
-
 ✅ Does NOT read Redux call status
 ✅ Does NOT control UI
 ✅ Does NOT trust the UI or signaling layer
 
-It uses internal guards based on:
-
-RTCPeerConnection state
-
-signalingState
-
-internal refs (pcRef, remotePeerIdRef)
-
-This guarantees:
-
-No double calls
-
-No duplicate offers
-
-Safe reconnection
-
-Idempotent cleanup
+It uses internal guards based on RTCPeerConnection state, signalingState, internal refs (pcRef, remotePeerIdRef). This guarantees no double calls, no duplicate offers, safe reconnection, and idempotent cleanup.
 
 📡 WebSocket Signaling
+WebSocket is used for chat messages and call signaling events (call:offer, call:answer, call:ice, call:end). All incoming signaling messages are dispatched to Redux (for UI & state) and forwarded to useWebRTC only when valid.
 
-WebSocket is used for:
+## 🎥 Media Streams
+Reactive streams are managed via React state:
 
-Chat messages
-
-Call signaling events:
-
-call:offer
-
-call:answer
-
-call:ice
-
-call:end
-
-All incoming signaling messages are:
-
-Dispatched to Redux (for UI & state)
-
-Forwarded to useWebRTC only when valid
-
-🎥 Media Streams
-Reactive Streams
+```ts
 const [localStream, setLocalStream] = useState(null);
 const [remoteStream, setRemoteStream] = useState(null);
+Streams are React state, so the UI automatically updates when the camera/microphone is ready or the remote peer connects.
+```
 
+## 🧠 Defensive Programming
+The project handles edge cases: double incoming offers, offer while already in a call, late ICE candidates, answer after hang-up, network disconnects, peer crashes. Unsafe conditions are ignored or auto-rejected.
 
-Streams are React state, not refs, so the UI automatically updates when:
+## 🖥️ UI Components
+ChatList — contacts, unread counters, search
 
-Camera/microphone is ready
+ChatWindow — messages, send/delete, start call
 
-Remote peer connects
+VideoCall — incoming call modal, video streams, hang up
 
-🧠 Defensive Programming
+ConfirmModal — reusable confirmation UI
 
-This project intentionally handles edge cases:
+## 🔐 TURN / STUN Configuration
 
-Double incoming offers
-
-Offer while already in a call
-
-Late ICE candidates
-
-Answer after hang-up
-
-Network disconnects
-
-Peer crashes
-
-All unsafe conditions are ignored or auto-rejected.
-
-🖥️ UI Components
-
-ChatList
-
-Contacts
-
-Unread counters
-
-Search
-
-ChatWindow
-
-Messages
-
-Send / delete
-
-Start call
-
-VideoCall
-
-Incoming call modal
-
-Video streams
-
-Hang up
-
-ConfirmModal
-
-Reusable confirmation UI
-
-🔐 TURN / STUN Configuration
+```ts
 const ICE_SERVERS = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
-    {
-      urls: "turn:<HOST>:3478",
-      username: "user",
-      credential: "pass",
-    },
-  ],
+    { urls: "turn:<HOST>:3478", username: "user", credential: "pass" }
+  ]
 };
+```
 
-🧪 Key Principles Used
+## 🧪 Key Principles Used
+Separation of concerns, finite state machines, reactive UI, idempotent cleanup, race-condition safety, WebRTC best practices.
 
-Separation of concerns
-
-Finite state machines
-
-Reactive UI
-
-Idempotent cleanup
-
-Race-condition safety
-
-WebRTC best practices
-
-🚀 Possible Extensions
-
+### 🚀 Possible Extensions
 Group calls
 
 Screen sharing
@@ -253,12 +132,7 @@ Push notifications
 
 End-to-end encryption
 
-📌 Summary
-
-This project is not just a chat app —
-it is a reference architecture for building reliable real-time applications with React, Redux, WebSocket, and WebRTC.
-
-If you understand this codebase —
-you understand how to build production-grade real-time systems.
+### 📌 Summary
+This project is not just a chat app — it is a reference architecture for building reliable real-time applications with React, Redux, WebSocket, and WebRTC. If you understand this codebase, you understand how to build production-grade real-time systems.
 
 Happy hacking 🚀
