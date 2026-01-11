@@ -1,0 +1,37 @@
+services:
+  coturn:
+    image: coturn/coturn
+    network_mode: bridge
+    ports:
+      - "3478:3478/udp"
+      - "3478:3478/tcp"
+      - "49160-49200:49160-49200/udp"
+    command: >
+      turnserver
+      --lt-cred-mech
+      --realm=example.com
+      --user=user:pass
+      --min-port=49160
+      --max-port=49200
+      --fingerprint
+      --no-multicast-peers
+      --no-cli
+      --log-file=stdout
+
+  node:
+    build: .
+    container_name: chat-node
+    ports:
+      - "3000:3000"
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+      - ./nginx/certs:/etc/nginx/certs
+      - ./public:/usr/share/nginx/html
+    depends_on:
+      - node
