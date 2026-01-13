@@ -12,6 +12,5 @@ export function playNotificationSound() {
 
   audio.currentTime = 0;
   audio.play().catch(() => {
-    // браузер заблокировал — это нормально
   });
 }

@@ -1,7 +1,8 @@
-import { createSlice } from "@reduxjs/toolkit";
+import {createSlice, type PayloadAction} from "@reduxjs/toolkit";
+import type {CallState, FromOffer} from "@/features/call/model/types.ts";
 
-const initialState = {
-  status: "idle", // idle | ringing | calling | connecting | in_call
+const initialState: CallState = {
+  status: "idle",
   peerId: null,
   offer: null,
 };
@@ -10,13 +11,13 @@ const callSlice = createSlice({
   name: "call",
   initialState,
   reducers: {
-    outgoingCall(state, action) {
+    outgoingCall(state, action: PayloadAction<string>) {
       if (state.status !== "idle") return;
       state.status = "calling";
       state.peerId = action.payload;
     },
 
-    incomingOffer(state, action) {
+    incomingOffer(state, action: PayloadAction<FromOffer>) {
       if (state.status !== "idle") return;
       state.status = "ringing";
       state.peerId = action.payload.from;

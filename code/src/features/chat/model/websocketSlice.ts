@@ -1,13 +1,16 @@
-import { createSlice } from "@reduxjs/toolkit";
+import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
+import type {IncomingWSMessage, OutgoingWSMessage, WebSocketState} from "@/features/chat/model/types.ts";
+
+const initialState: WebSocketState = {
+  status: "disconnected",
+  lastIncoming: null,
+  lastOutgoing: null,
+  error: null,
+};
 
 const websocketSlice = createSlice({
   name: "ws",
-  initialState: {
-    status: "disconnected", // connecting | connected
-    lastIncoming: null, // последнее сообщение ОТ сервера
-    lastOutgoing: null, // последнее сообщение ОТ клиента
-    error: null,
-  },
+  initialState,
   reducers: {
     connecting(state) {
       state.status = "connecting";
@@ -23,15 +26,15 @@ const websocketSlice = createSlice({
       state.status = "disconnected";
     },
 
-    incoming(state, action) {
+    incoming(state, action: PayloadAction<IncomingWSMessage>) {
       state.lastIncoming = action.payload;
     },
 
-    outgoing(state, action) {
+    outgoing(state, action: PayloadAction<OutgoingWSMessage>) {
       state.lastOutgoing = action.payload;
     },
 
-    error(state, action) {
+    error(state, action: PayloadAction<string>) {
       state.error = action.payload;
     },
 

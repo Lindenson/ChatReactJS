@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { checkChatContacts } from "@/features/chat/lib/chatApi.js";
+import { checkChatContacts } from "@/features/chat/rest/chatApi.js";
 
 export default function LoginPage({ onLogin }) {
   const [userId, setUserId] = useState("");

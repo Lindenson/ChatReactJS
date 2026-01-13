@@ -5,9 +5,9 @@ import { useState } from "react";
  * unreadChats: Set<chatId>
  */
 export function useUnreadChats() {
-  const [unreadChats, setUnreadChats] = useState(new Set());
+  const [unreadChats, setUnreadChats] = useState<Set<string>>(new Set());
 
-  function markUnread(chatId) {
+  function markUnread(chatId: string) {
     setUnreadChats((prev) => {
       if (prev.has(chatId)) return prev;
       const next = new Set(prev);
@@ -16,7 +16,7 @@ export function useUnreadChats() {
     });
   }
 
-  function markRead(chatId) {
+  function markRead(chatId: string) {
     setUnreadChats((prev) => {
       if (!prev.has(chatId)) return prev;
       const next = new Set(prev);
