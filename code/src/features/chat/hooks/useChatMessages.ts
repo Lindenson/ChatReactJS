@@ -1,27 +1,32 @@
 import {useCallback, useState} from "react";
-import {fetchChatHistory} from "@/features/chat/rest/chatApi.js";
-import type {ChatMessage, Contact, IncomingChatMessage, MessagesMap} from "@/features/chat/model/types.ts";
+import {deleteChatHistory, fetchChatHistory} from "@/features/chat/rest/chatApi.js";
+import type {ChatMessagesMap, ChatMessageView, Contact, DomainChatMessage} from "@/features/chat/model/types.ts";
+import {toChatMessageView} from "@/features/chat/model/mapper.ts";
+import {useSelector} from "react-redux";
+import type {RootState} from "@/store/store.ts";
 
-interface ReloadChatParams {
-    chatId: number;
-    myId: string;
-    contacts: Contact[];
-}
 
 interface HandleIncomingParams {
-    msg: IncomingChatMessage;
-    myId: string;
-    contacts: Contact[];
-    onUnread?: (chatId: number) => void;
+    msg: DomainChatMessage;
+    onUnread?: (chatId: string) => void;
 }
 
-
 export function useChatMessages() {
-    const [messagesMap, setMessagesMap] = useState<MessagesMap>(new Map());
+
+    /* ======================
+       Messages View Storage
+    ====================== */
+    const [messagesMap, setMessagesMap] = useState<ChatMessagesMap>(new Map());
+
+    /* ======================
+       User info
+    ====================== */
+    const myId = useSelector((state: RootState) => state.user.id);
+
 
     // ===== Set full history =====
     const setChatHistory = useCallback(
-        (chatId: number, messages: ChatMessage[]) => {
+        (chatId: string, messages: ChatMessageView[]) => {
             setMessagesMap((prev) => {
                 const next = new Map(prev);
                 next.set(chatId, messages);
@@ -33,36 +38,27 @@ export function useChatMessages() {
 
     // ===== Reload history from backend =====
     const reloadChatHistory = useCallback(
-        async ({chatId, myId, contacts}: ReloadChatParams) => {
-            const contact = contacts[chatId];
-            if (!contact) return;
-
+        async (chat: Contact) => {
+            console.debug("reloadChatHistory", chat);
             try {
-                const rawHistory = await fetchChatHistory(myId, contact.name);
+                const rawHistory = await fetchChatHistory(myId, chat.id);
+                const normalized: ChatMessageView[] = rawHistory.map((msg: DomainChatMessage) =>
+                    toChatMessageView(msg, myId)
+                );
 
-                const normalized: ChatMessage[] = rawHistory.map((msg: any) => ({
-                    fromMe: msg.from === myId,
-                    text: msg.text,
-                }));
-
-                setChatHistory(chatId, normalized);
+                setChatHistory(chat.id, normalized);
             } catch (e) {
                 console.error("Reload chat history error", e);
             }
         },
-        [setChatHistory]
+        [myId, setChatHistory]
     );
 
     // ===== Handle incoming WS message =====
     const handleIncomingMessage = useCallback(
-        ({msg, myId, contacts, onUnread}: HandleIncomingParams) => {
-            const chatName = msg.from === myId ? msg.to : msg.from;
-            const chatId = contacts.findIndex((c) => c.name === chatName);
-
-            if (chatId === -1) {
-                console.warn("Unknown chat:", chatName);
-                return;
-            }
+        ({msg, onUnread}: HandleIncomingParams) => {
+            console.debug("handleIncomingMessage", msg);
+            const chatId = msg.from === myId ? msg.to : msg.from;
 
             if (msg.from !== myId) {
                 onUnread?.(chatId);
@@ -71,33 +67,26 @@ export function useChatMessages() {
             setMessagesMap((prev) => {
                 const next = new Map(prev);
                 const chatMessages = next.get(chatId) ?? [];
-
-                next.set(chatId, [
-                    ...chatMessages,
-                    {
-                        fromMe: msg.from === myId,
-                        text: msg.text,
-                    },
-                ]);
-
+                next.set(chatId, [...chatMessages, toChatMessageView(msg, myId)]);
                 return next;
             });
         },
-        []
+        [myId]
     );
 
     // ===== Clear chat =====
-    const clearChat = useCallback((chatId: number) => {
+    const clearChat = useCallback(async (chat: Contact) => {
+        console.debug("clearChat", chat);
+        await deleteChatHistory(myId, chat.id);
         setMessagesMap((prev) => {
             const next = new Map(prev);
-            next.delete(chatId);
+            next.delete(chat.id);
             return next;
         });
-    }, []);
+    }, [myId]);
 
     return {
         messagesMap,
-        setChatHistory,
         reloadChatHistory,
         handleIncomingMessage,
         clearChat,

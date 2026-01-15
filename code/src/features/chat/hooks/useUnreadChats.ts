@@ -1,9 +1,6 @@
 import { useState } from "react";
 
-/**
- * Управляет непрочитанными чатами
- * unreadChats: Set<chatId>
- */
+
 export function useUnreadChats() {
   const [unreadChats, setUnreadChats] = useState<Set<string>>(new Set());
 

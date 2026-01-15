@@ -1,28 +1,28 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { checkChatContacts } from "@/features/chat/rest/chatApi.js";
+import { checkLogin } from "@/features/chat/rest/chatApi.ts";
 
 export default function LoginPage({ onLogin }) {
-  const [userId, setUserId] = useState("");
+  const [userName, setUserName] = useState("");
   const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
 
   async function handleLogin() {
-    const user = userId.trim();
+    const user = userName.trim();
     if (!user) return;
 
     setLoading(true);
 
     try {
-      const exists = await checkChatContacts(user);
+      const userFound = await checkLogin(user);
 
-      if (!exists) {
+      if (!userFound) {
         alert("Usuario no encontrado en contactos.");
         return;
       }
 
-      onLogin(user);
+      onLogin(userFound.name, userFound.id);
       navigate("/", { replace: true });
     } catch (error) {
       console.error("Login error:", error);
@@ -40,8 +40,8 @@ export default function LoginPage({ onLogin }) {
         <input
           type="text"
           placeholder="Tu ID (ej: user1)"
-          value={userId}
-          onChange={(e) => setUserId(e.target.value)}
+          value={userName}
+          onChange={(e) => setUserName(e.target.value)}
           className="w-full border rounded px-3 py-2 mb-4"
           disabled={loading}
         />

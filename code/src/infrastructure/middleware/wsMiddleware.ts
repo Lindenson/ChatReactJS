@@ -7,10 +7,12 @@ import {
     error as wsError,
     incoming,
     outgoing,
-} from "@/features/chat/model/websocketSlice";
+} from "@/features/chat/model/slices/websocketSlice.ts";
 
-import { DELAY_STEP_MS, MAX_RECONNECT_DELAY } from "@/shared/config/ws";
-import type {OutgoingWSMessage} from "@/features/chat/model/types.ts";
+import { DELAY_STEP_MS, MAX_RECONNECT_DELAY } from "@/shared/config/ws.ts";
+import type {IncomingWSMessage, OutgoingWSMessage} from "@/features/chat/model/types.ts";
+import {isNotLogged} from "@/shared/utils/checks.ts";
+import type {User} from "@/features/auth/types.ts";
 
 
 type WSConnectAction = PayloadAction<{ url: string }, string, { shouldReconnect: boolean; }>
@@ -42,12 +44,19 @@ export const websocketMiddleware: Middleware =
                 MAX_RECONNECT_DELAY
             );
 
-            console.log(`🔁 WS reconnect #${reconnectAttempts} in ${delay}ms`);
-
+            console.debug(`🔁 WS reconnect #${reconnectAttempts} in ${delay}ms`);
             reconnectTimeout = setTimeout(() => connect(url, true), delay);
         };
 
         const connect = (url: string, shouldReconnect: boolean) => {
+            const state = store.getState();
+            const user : User = state.user;
+
+            if (isNotLogged(user.id)) {
+                console.debug("WS connect skipped: user not logged in");
+                return;
+            }
+
             if (
                 socket &&
                 (socket.readyState === WebSocket.OPEN ||
@@ -62,11 +71,12 @@ export const websocketMiddleware: Middleware =
             socket.onopen = () => {
                 reconnectAttempts = 0;
                 dispatch(connected());
+                console.debug(`🔗 WS connected #${reconnectAttempts} to ${url}`);
             };
 
             socket.onmessage = (event: MessageEvent<string>) => {
                 try {
-                    const data = JSON.parse(event.data);
+                    const data : IncomingWSMessage = JSON.parse(event.data);
                     dispatch(incoming(data));
                 } catch {
                     dispatch(wsError("WS parse error"));
@@ -111,6 +121,7 @@ export const websocketMiddleware: Middleware =
             }
 
             case "ws/disconnect": {
+                console.debug("disconnected ws by forth");
                 if (reconnectTimeout) {
                     clearTimeout(reconnectTimeout);
                     reconnectTimeout = null;

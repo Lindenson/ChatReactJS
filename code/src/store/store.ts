@@ -1,13 +1,15 @@
 import {configureStore} from "@reduxjs/toolkit";
 
 // Reducers
-import callReducer from "@/features/call/model/callSlice";
-import wsReducer from "@/features/chat/model/websocketSlice.ts";
-import outboxReducer, {hydrateOutbox, markPersisted} from "@/features/chat/model/outboxSlice";
+import userReducer from "@/features/auth/slices/userSlice";
+import callReducer from "@/features/call/model/slices/callSlice";
+import wsReducer from "@/features/chat/model/slices/websocketSlice";
+import outboxReducer, {hydrateOutbox, markPersisted} from "@/features/chat/model/slices/outboxSlice";
+
 
 // Middleware
 import {callMiddleware} from "@/features/call/middleware/callMiddleware";
-import {websocketMiddleware} from "@/features/chat/middleware/wsMiddleware";
+import {websocketMiddleware} from "@/infrastructure/middleware/wsMiddleware.ts";
 
 // DB functions
 import {loadOutboxFromDB, saveOutboxToDB} from "@/features/chat/db/db";
@@ -18,6 +20,7 @@ export const store = configureStore({
         call: callReducer,
         ws: wsReducer,
         outbox: outboxReducer,
+        user: userReducer
     },
     middleware: (getDefaultMiddleware) =>
         getDefaultMiddleware().concat(websocketMiddleware, callMiddleware),

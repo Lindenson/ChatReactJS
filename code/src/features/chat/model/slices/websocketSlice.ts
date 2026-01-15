@@ -27,6 +27,8 @@ const websocketSlice = createSlice({
     },
 
     incoming(state, action: PayloadAction<IncomingWSMessage>) {
+      console.log("callMiddlewareB");
+      console.log(JSON.stringify(action.payload));
       state.lastIncoming = action.payload;
     },
 

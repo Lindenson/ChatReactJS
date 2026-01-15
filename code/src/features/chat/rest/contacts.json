@@ -1,22 +1,32 @@
 [
   {
+    "id": "a1f5b2c0-1d3e-4a9f-8b12-1234567890ab",
     "name": "Miguel",
-    "last": "de Tilo"
+    "last": "de Tilo",
+    "online": true
   },
   {
+    "id": "b2c6d3e1-2f4a-5b0f-9c23-2345678901bc",
     "name": "Alvaro",
-    "last": "Reig"
+    "last": "Reig",
+    "online": true
   },
   {
+    "id": "c3d7e4f2-3g5b-6c1g-0d34-3456789012cd",
     "name": "Denis",
-    "last": "de Tilo"
+    "last": "de Tilo",
+    "online": true
   },
   {
+    "id": "d4e8f5g3-4h6c-7d2h-1e45-4567890123de",
     "name": "Olga",
-    "last": "de Tilo"
+    "last": "de Tilo",
+    "online": true
   },
   {
+    "id": "e5f9g6h4-5i7d-8e3i-2f56-5678901234ef",
     "name": "Equipo",
-    "last": "Hormiga"
+    "last": "Hormiga",
+    "online": true
   }
 ]

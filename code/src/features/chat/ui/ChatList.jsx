@@ -42,15 +42,15 @@ export default function ChatList({
 
       {/* Chat list */}
       <div className="overflow-y-auto">
-        {chats.map((chat, i) => {
-          const isUnread = unreadChats?.has(i);
+        {chats.map((chat) => {
+          const isUnread = unreadChats?.has(chat.id);
 
           return (
             <div
-              key={i}
-              onClick={() => setSelectedChat(i)}
+              key={chat.id}
+              onClick={() => setSelectedChat(chat.id)}
               className={`p-4 cursor-pointer hover:bg-gray-100
-                ${selectedChat === i ? "bg-gray-100" : ""}`}
+                ${selectedChat === chat.id ? "bg-gray-100" : ""}`}
             >
               {/* Name + unread dot */}
               <div className="flex items-center gap-2">

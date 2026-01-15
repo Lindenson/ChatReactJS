@@ -1,4 +1,4 @@
-import {incomingAnswer, incomingOffer, incomingRemoteEnd,} from "@/features/call/model/callSlice.js";
+import {incomingAnswer, incomingOffer, incomingRemoteEnd,} from "@/features/call/model/slices/callSlice.js";
 import type {Middleware, PayloadAction} from "@reduxjs/toolkit";
 import type {IncomingWebRTCMessage} from "@/features/call/model/types.ts";
 

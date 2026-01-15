@@ -3,6 +3,8 @@
 // WebSocket layer
 // ===========================
 
+import type {IncomingWebRTCMessage} from "@/features/call/model/types.ts";
+
 type WSStatus = "disconnected" | "connecting" | "connected"
 
 export type WebSocketState = {
@@ -12,10 +14,10 @@ export type WebSocketState = {
     error: string | null;
 };
 
-export type IncomingWSMessage = {
-    type: string;
-    payload?: unknown;
-};
+export type IncomingWSMessage =
+    | { type: "message"; payload: DomainChatMessage }
+    | IncomingWebRTCMessage;
+
 
 export type OutgoingWSMessage = {
     type: string;
@@ -24,22 +26,20 @@ export type OutgoingWSMessage = {
 
 
 // ===========================
-// Outbox (sending queue)
+// Outbox bd layer
 // ===========================
 
 export type OutboxMessagePayload = {
     from: string;
     to: string;
-    message: string;
+    text: string;
 }
-
-type OutboxMSStatus = "pending" | "sending" | "sent" | "failed"
 
 export type OutboxMessage = {
     id: string;
     idempotencyKey: string;
     payload: OutboxMessagePayload;
-    status: OutboxMSStatus;
+    status: ChatMessageStatus;
 };
 
 export type OutboxState = {
@@ -50,22 +50,49 @@ export type OutboxState = {
 
 
 // ===========================
-// Chat layer
+// Chat UI
 // ===========================
 
-export type ChatMessage = {
+export type ChatMessageView = {
+    id: MessageId;
     fromMe: boolean;
     text: string;
+    status: ChatMessageStatus;
 };
 
-export type MessagesMap = Map<number, ChatMessage[]>;
+export type ChatMessagesMap = Map<string, ChatMessageView[]>;
 
 export type Contact = {
+    id: string;
     name: string;
+    last: string;
+    online: boolean;
 };
 
-export type IncomingChatMessage = {
+// ===========================
+// Domain: Message
+// ===========================
+
+export type MessageId = string;
+export type ChatId = string;
+
+export type ChatMessageStatus =
+    | "pending"
+    | "sending"
+    | "sent"
+    | "failed";
+
+export type DomainChatMessage = {
+    id: MessageId;
+    chatId: ChatId;
+
     from: string;
     to: string;
+
     text: string;
+
+    createdAt: number;
+    status: ChatMessageStatus;
+
+    idempotencyKey: string;
 };

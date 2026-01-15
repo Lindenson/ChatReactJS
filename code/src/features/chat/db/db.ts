@@ -1,6 +1,6 @@
 import {type IDBPDatabase, openDB} from 'idb';
 import {DB_NAME, DB_VERSION, STORE_KEY, STORE_NAME} from "@/shared/config/idb";
-import type {OutboxState} from "@/features/chat/model/types.ts";
+import type {OutboxState} from "@/features/chat/model/types";
 
 
 type ChatDB = { outbox: OutboxState };

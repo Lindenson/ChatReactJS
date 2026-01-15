@@ -1,16 +1,17 @@
 import {createAsyncThunk} from "@reduxjs/toolkit";
-import {type ChatMessagePayload, markFailed, markSending, markSent,} from "../model/outboxSlice";
+import {markFailed, markSending, markSent,} from "../model/slices/outboxSlice.ts";
 import type {RootState} from "@/store/store";
+import type {OutboxMessage} from "@/features/chat/model/types.ts";
 
 
-async function sendToServer(msg: ChatMessagePayload, idempotencyKey: string) {
+async function sendToServer(msg: OutboxMessage) {
     await fetch("/api/messages", {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
-            "Idempotency-Key": idempotencyKey,
+            "Idempotency-Key": msg.idempotencyKey,
         },
-        body: JSON.stringify(msg),
+        body: JSON.stringify(msg.payload),
     });
 }
 
@@ -24,7 +25,7 @@ export const flushOutbox = createAsyncThunk<
         dispatch(markSending(msg.id));
 
         try {
-            await sendToServer(msg.payload, msg.idempotencyKey);
+            await sendToServer(msg);
             dispatch(markSent(msg.id));
         } catch {
             dispatch(markFailed(msg.id));

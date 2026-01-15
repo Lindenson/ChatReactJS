@@ -1,43 +1,62 @@
 import "./App.css";
-import {useState} from "react";
+import {useEffect} from "react";
 import {BrowserRouter, Route, Routes} from "react-router-dom";
-import Messenger from "@/pages/Messenger";
-import LoginPage from "@/pages/LoginPage";
-import LogoutPage from "@/pages/LogoutPage";
-
 import {initNotificationSound} from "@/shared/sound/sound.js";
-import {LS_NAME} from "@/shared/config/ls.ts";
+import type {AppDispatch} from "@/store/store";
+import {useDispatch} from "react-redux";
+
+import {clearUser, markInitialized, setUser} from "@/features/auth/slices/userSlice";
+import {RequireAuth} from "@/features/auth/ui/RequireAuth.tsx";
+import Messenger from "@/pages/Messenger.tsx";
+import LoginPage from "@/pages/LoginPage";
+import LogoutPage from "@/pages/LogoutPage.tsx";
+import {LS_ID, LS_NAME} from "@/shared/config/ls.ts";
+
 
 function App() {
-    const [userId, setUserId] = useState(localStorage.getItem(LS_NAME));
+    const dispatch = useDispatch<AppDispatch>();
 
-    function handleLogin(id: string) {
-        localStorage.setItem(LS_NAME, id);
-        initNotificationSound();
-        setUserId(id);
+    useEffect(() => {
+        const id = localStorage.getItem(LS_ID);
+        const name = localStorage.getItem(LS_NAME);
+
+        if (id?.trim() && name?.trim()) {
+            initNotificationSound();
+            dispatch(setUser({ id, name }));
+        } else {
+            dispatch(markInitialized());
+        }
+    }, [dispatch]);
+
+    function handleLogin(name: string, id: string) {
+        localStorage.setItem(LS_NAME, name);
+        localStorage.setItem(LS_ID, id);
+        dispatch(setUser({name, id}));
     }
 
     function handleLogout() {
         localStorage.removeItem(LS_NAME);
-        setUserId("");
+        localStorage.removeItem(LS_ID);
+        dispatch(clearUser());
     }
 
     return (
         <BrowserRouter>
             <Routes>
-                {!userId && (
-                    <Route path="/*" element={<LoginPage onLogin={handleLogin}/>}/>
-                )}
-                {!!userId && <Route path="/*" element={<Messenger myId={userId}/>}/>}
-                {!!userId && (
-                    <Route
-                        path="/logout"
-                        element={<LogoutPage onLogout={handleLogout}/>}
-                    />
-                )}
+                <Route
+                    path="/"
+                    element={
+                        <RequireAuth>
+                            <Messenger/>
+                        </RequireAuth>
+                    }
+                />
+                <Route path="/login" element={<LoginPage onLogin={handleLogin}/>}/>
+                <Route path="/logout" element={<LogoutPage onLogout={handleLogout}/>}/>
             </Routes>
         </BrowserRouter>
     );
 }
+
 
 export default App;
