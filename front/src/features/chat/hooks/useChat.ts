@@ -1,8 +1,9 @@
-import {useCallback, useMemo, useState, useEffect} from "react";
+import {useCallback, useMemo, useState, useEffect, useRef} from "react";
 import {useDispatch, useSelector} from "react-redux";
 import {setSelectedChatId} from "@/features/chat/model/slices/chatUiSlice";
 import {rememberSticky, forgetSticky} from "@/features/chat/model/slices/stickyChatsSlice";
 import {chatApi} from "@/features/chat/rest/chatApi.ts";
+import {reconcileOrphanCaches} from "@/features/chat/db/orphanGc.ts";
 import type {AppDispatch, RootState} from "@/store/store";
 
 import {useChatMessages} from "./useChatMessages";
@@ -38,7 +39,21 @@ export function useChat() {
     /* ======================
        Contacts (chat list from GET /api/chats)
     ====================== */
-    const {contacts, summaries, getContactById, getSummary, isLoadingIds} = useContacts();
+    const {contacts, summaries, getContactById, getSummary, isLoadingIds, isErrorIds} = useContacts();
+
+    // One-shot orphan cache sweep: once the authoritative chat list has loaded (logged in, settled, no
+    // error), purge locally-cached history / attachment blobs / secret plaintext for conversations that no
+    // longer exist — deleted chats whose immediate cleanup was missed, or chats deleted on another device.
+    // Guarded to run only against a COMPLETE, successful list (never while loading or errored, which would
+    // wrongly evict live chats). Ref-guarded so it runs a single time per mount.
+    const sweptOrphans = useRef(false);
+    useEffect(() => {
+        if (sweptOrphans.current) return;
+        if (!myId || isLoadingIds || isErrorIds) return;
+        sweptOrphans.current = true;
+        const liveIds = new Set(summaries.map((s) => s.conversationId));
+        void reconcileOrphanCaches(liveIds);
+    }, [myId, isLoadingIds, isErrorIds, summaries]);
 
     // Close a chat whose conversation is no longer in the (loaded) list — e.g. a soft-deleted/empty
     // chat the backend transiently lists then drops on a getChats refetch. Without this, ChatWindow

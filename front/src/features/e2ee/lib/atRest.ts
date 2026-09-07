@@ -69,6 +69,18 @@ export async function deletePlaintextForChat(chatId: string): Promise<void> {
     } catch { /* best-effort */ }
 }
 
+/** The distinct chatIds that have stored plaintext (for the startup orphan sweep). Skips v1 records (no
+ * chatId) — those pre-date the tag and can't be attributed to a chat, so the sweep leaves them to the TTL. */
+export async function plaintextChatIds(): Promise<string[]> {
+    try {
+        const d = await db();
+        const vals = (await d.getAll(STORE)) as Array<Rec | Wrapped>;
+        const ids = new Set<string>();
+        for (const v of vals) if ("chatId" in v && v.chatId) ids.add(v.chatId);
+        return [...ids];
+    } catch { return []; }
+}
+
 /** Count + on-disk bytes of stored secret plaintext (device-key-wrapped), for the info page. */
 export async function plaintextStats(): Promise<{count: number; bytes: number}> {
     try {

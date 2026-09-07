@@ -19,9 +19,12 @@ export function useContacts() {
 
     // The chat list spans TWO resources in the deployed backend (variant A — separate, not unioned):
     // DIRECT chats (GET /api/chats) and GROUPS (GET /api/groups). Fetch both and merge.
-    const {data: directSummaries = [], isLoading: chatsLoading, isError} = useGetChatsQuery({myId}, {skip});
-    const {data: groupItems = [], isLoading: groupsLoading} = useGetGroupsQuery(undefined, {skip});
+    const {data: directSummaries = [], isLoading: chatsLoading, isError: chatsError} = useGetChatsQuery({myId}, {skip});
+    const {data: groupItems = [], isLoading: groupsLoading, isError: groupsError} = useGetGroupsQuery(undefined, {skip});
     const isLoading = chatsLoading || groupsLoading;
+    // Either list failing means `summaries` is incomplete — consumers that reconcile against it (the orphan
+    // cache sweep) must treat that as "don't trust this set", never as "these chats no longer exist".
+    const isError = chatsError || groupsError;
     // Sticky DIRECT chats the user engaged with but the backend hides (empty → omitted from
     // /api/chats). Merge in only those NOT already returned by the backend (a chat with activity comes
     // from getChats and wins). Groups aren't stickied (getGroups already lists them all).

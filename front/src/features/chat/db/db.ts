@@ -151,15 +151,44 @@ export async function deleteChatCache(chatId: string): Promise<void> {
     try {
         const db = await initDB();
         const msgs = (await db.get(HISTORY_STORE_NAME, chatId)) as ChatMessage[] | undefined;
-        if (Array.isArray(msgs)) {
-            for (const m of msgs) {
-                const aid = m?.meta?.attachmentId;
-                if (aid) {
-                    await db.delete(ATTACHMENT_BLOB_STORE, aid).catch(() => {});
-                    await db.delete(ATTACHMENT_INDEX_STORE, aid).catch(() => {});
-                }
-            }
+        const aids = Array.isArray(msgs)
+            ? msgs.map((m) => m?.meta?.attachmentId).filter((a): a is string => !!a)
+            : [];
+        for (const aid of aids) await db.delete(ATTACHMENT_BLOB_STORE, aid).catch(() => {});
+        if (aids.length) {
+            // The index store holds ONE array-of-{id,size} record (keyed by ATTACHMENT_INDEX_KEY); the
+            // blobs are keyed by attachmentId. So the removed ids are filtered OUT of that array — a
+            // db.delete(ATTACHMENT_INDEX_STORE, aid) would silently miss (wrong key shape) and leak the
+            // byte accounting, which was the pre-existing bug.
+            const dropped = new Set(aids);
+            const index = await readCacheIndex(db);
+            const next = index.filter((e) => !dropped.has(e.id));
+            if (next.length !== index.length) await db.put(ATTACHMENT_INDEX_STORE, next, ATTACHMENT_INDEX_KEY);
         }
         await db.delete(HISTORY_STORE_NAME, chatId);
     } catch { /* best-effort */ }
+}
+
+/** The chatIds that currently have a cached history entry (used by the startup orphan sweep). */
+export async function historyChatIds(): Promise<string[]> {
+    try {
+        const db = await initDB();
+        return (await db.getAllKeys(HISTORY_STORE_NAME)) as string[];
+    } catch { return []; }
+}
+
+/** Drop index entries whose blob no longer exists — repairs byte-accounting drift from earlier deletes so
+ * the cache budget and the info page don't over-count. Best-effort; returns how many stale entries fell. */
+export async function pruneAttachmentIndex(): Promise<number> {
+    try {
+        const db = await initDB();
+        const liveBlobs = new Set((await db.getAllKeys(ATTACHMENT_BLOB_STORE)) as string[]);
+        const index = await readCacheIndex(db);
+        const next = index.filter((e) => liveBlobs.has(e.id));
+        if (next.length !== index.length) {
+            await db.put(ATTACHMENT_INDEX_STORE, next, ATTACHMENT_INDEX_KEY);
+            return index.length - next.length;
+        }
+    } catch { /* best-effort */ }
+    return 0;
 }

@@ -11,6 +11,7 @@ import {
     saveOutboxToDB, loadOutboxFromDB,
     saveHistoryToDB, loadHistoryFromDB,
     saveAttachmentBlob, loadAttachmentBlob, deleteAttachmentBlob,
+    deleteChatCache, historyChatIds, pruneAttachmentIndex,
     clearAllLocalData,
 } from "../db";
 import type {OutboxState} from "@/features/chat/model/types";
@@ -58,6 +59,32 @@ describe("db (IndexedDB via fake-indexeddb)", () => {
         expect(await loadAttachmentBlob("b")).toBeNull();
         expect(await loadAttachmentBlob("a")).not.toBeNull();
         expect(await loadAttachmentBlob("c")).not.toBeNull();
+    });
+
+    it("deleteChatCache drops the history AND its attachment blobs — and keeps the index consistent", async () => {
+        const msgs = [
+            {id: "m1", meta: {attachmentId: "att1"}},
+            {id: "m2"},
+            {id: "m3", meta: {attachmentId: "att2"}},
+        ] as unknown as ChatMessage[];
+        await saveHistoryToDB("c1", msgs);
+        await saveAttachmentBlob("att1", blob(10));
+        await saveAttachmentBlob("att2", blob(10));
+
+        await deleteChatCache("c1");
+
+        expect(await loadHistoryFromDB("c1")).toBeNull();
+        expect(await loadAttachmentBlob("att1")).toBeNull();
+        expect(await loadAttachmentBlob("att2")).toBeNull();
+        // Regression: the index entries were actually removed (the old code deleted by the wrong key shape
+        // and leaked them), so there is nothing dangling left to prune.
+        expect(await pruneAttachmentIndex()).toBe(0);
+    });
+
+    it("historyChatIds lists every cached conversation", async () => {
+        await saveHistoryToDB("c1", [{id: "a"}] as unknown as ChatMessage[]);
+        await saveHistoryToDB("c2", [{id: "b"}] as unknown as ChatMessage[]);
+        expect((await historyChatIds()).sort()).toEqual(["c1", "c2"]);
     });
 
     it("clearAllLocalData wipes outbox, history and media", async () => {
