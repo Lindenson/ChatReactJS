@@ -37,7 +37,16 @@ export function SafetyNumberModal({myUserId, peerUserId, peerName, onClose}: {
                 <p className="text-sm text-teal-800 mt-1">{t("chat.safetyDesc", {name: peerName})}</p>
 
                 {num === undefined ? (
-                    <div className="my-6 text-center text-teal-600 text-sm">{t("chat.safetyComputing")}</div>
+                    <div className="my-6 flex flex-col items-center gap-3 text-teal-600" role="status" aria-label={t("chat.safetyComputing")}>
+                        {/* Deriving the fingerprint runs a 1024-round hash — show a three-dot pulse so the wait
+                            reads as "generating", not stuck. Staggered negative delays make the dots wave. */}
+                        <span className="flex gap-1.5" aria-hidden="true">
+                            <span className="w-2 h-2 rounded-full bg-teal-500 animate-bounce motion-reduce:animate-none [animation-delay:-0.3s]"/>
+                            <span className="w-2 h-2 rounded-full bg-teal-500 animate-bounce motion-reduce:animate-none [animation-delay:-0.15s]"/>
+                            <span className="w-2 h-2 rounded-full bg-teal-500 animate-bounce motion-reduce:animate-none"/>
+                        </span>
+                        <span className="text-sm">{t("chat.safetyComputing")}</span>
+                    </div>
                 ) : num === null ? (
                     <div className="my-6 text-center text-amber-700 text-sm">{t("chat.safetyUnknown")}</div>
                 ) : (
