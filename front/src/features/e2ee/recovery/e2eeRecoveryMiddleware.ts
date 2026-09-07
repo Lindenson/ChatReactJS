@@ -50,6 +50,7 @@ export const e2eeRecoveryMiddleware: Middleware = (store) => {
         for (const g of groups.values()) {
             store.dispatch({type: "ws/send", payload: buildRequest(g.peerId, g.chatId, g.ids)});
             for (const id of g.ids) await bumpAttempt(id);
+            logger.info("e2ee recovery: requested", {peerId: g.peerId, chatId: g.chatId, ids: g.ids.length});
         }
     };
 
@@ -86,13 +87,15 @@ export const e2eeRecoveryMiddleware: Middleware = (store) => {
 
         // (2) incoming SIGNAL recovery frames (routed here via frameBridge e2ee: → SIGNAL).
         if (a?.type === "ws/incoming") {
-            const f = a.payload as {type?: string; from?: string; conversationId?: string; clientIds?: string[]; items?: RecoverResp["items"]};
+            const f = a.payload as {type?: string; from?: string; conversationId?: string; clientIds?: string[]; items?: RecoverResp["items"]; missing?: string[]};
             if (f?.type === RECOVER_REQ && f.from && f.conversationId && Array.isArray(f.clientIds)) {
                 void (async () => {
                     try {
                         const resp = await buildResponse(f.from!, f.conversationId!, f.clientIds!);
-                        if (resp.items.length) store.dispatch({type: "ws/send", payload: resp satisfies RecoverResp});
-                    } catch (e) { logger.debug("e2ee recovery: respond failed", e as Error); }
+                        // Send if we have ANYTHING to say — recovered items OR a NACK for what we can't provide.
+                        // A silent no-op here is what leaves the requester waiting out the whole retry budget.
+                        if (resp.items.length || resp.missing.length) store.dispatch({type: "ws/send", payload: resp satisfies RecoverResp});
+                    } catch (e) { logger.warn("e2ee recovery: respond failed", e as Error); }
                 })();
                 return result;
             }
@@ -100,6 +103,7 @@ export const e2eeRecoveryMiddleware: Middleware = (store) => {
                 void (async () => {
                     try {
                         const recovered = await applyResponse(f.from!, f.conversationId!, f.items!);
+                        const missing = Array.isArray(f.missing) ? f.missing : [];
                         const pend = await allPending();
                         const byClient = new Map(pend.map((p) => [p.clientId, p]));
                         for (const {forClientId, plaintext} of recovered) {
@@ -109,7 +113,16 @@ export const e2eeRecoveryMiddleware: Middleware = (store) => {
                             patchRow(p.chatId, p.serverId, plaintext);
                             await removePending(forClientId);
                         }
-                    } catch (e) { logger.debug("e2ee recovery: apply failed", e as Error); }
+                        // Definitive NACK from the sender: it sent these but no longer holds them (past the 48h
+                        // window) or never did — mark lost NOW instead of waiting out the retry budget.
+                        for (const mid of missing) {
+                            const p = byClient.get(mid);
+                            if (!p) continue;
+                            patchRow(p.chatId, p.serverId, i18n.t(secretStateKey("lost")));
+                            await removePending(mid);
+                        }
+                        logger.info("e2ee recovery: applied", {recovered: recovered.length, lost: missing.length, items: f.items!.length});
+                    } catch (e) { logger.warn("e2ee recovery: apply failed", e as Error); }
                 })();
                 return result;
             }

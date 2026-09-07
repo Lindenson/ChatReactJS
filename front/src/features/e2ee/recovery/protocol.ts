@@ -1,6 +1,7 @@
 import {ensureProvisioned} from "../lib/provisioning.ts";
 import {encryptRecovery, decryptRecovery, type RecoverCipher} from "../lib/secretSession.ts";
 import {loadPlaintext, E2EE_PLAINTEXT_TTL_MS} from "../lib/atRest.ts";
+import {logger} from "@/shared/logger/logger.ts";
 
 // The recovery protocol messages (ride the opaque SIGNAL channel, so `from`/`to`/`conversationId` are added
 // by the transport). clientIds are NOT secret; only the recovered message bodies are (re-encrypted). The
@@ -12,7 +13,12 @@ export const RECOVER_RESP = "e2ee:recover-resp";
 export const MAX_RECOVER_BATCH = 50;          // cap ids per request (anti-storm / anti-oracle)
 
 export interface RecoverReq { type: typeof RECOVER_REQ; to: string; conversationId: string; clientIds: string[] }
-export interface RecoverResp { type: typeof RECOVER_RESP; to: string; conversationId: string; items: RecoverCipher[] }
+// `items` = messages the responder could re-encrypt; `missing` = ids it CANNOT provide (expired past the
+// 48h window, or it never held them). The NACK matters: without it the requester can't tell "the sender is
+// still thinking / offline" from "the sender genuinely can't help", so it would wait out the whole retry
+// budget (~6 min) before giving up. With it, an unrecoverable message is marked lost as soon as the sender
+// answers — a definitive outcome, not silent limbo.
+export interface RecoverResp { type: typeof RECOVER_RESP; to: string; conversationId: string; items: RecoverCipher[]; missing: string[] }
 
 /** Build the outgoing request frame (batched, capped). */
 export function buildRequest(peerId: string, chatId: string, clientIds: string[]): RecoverReq {
@@ -27,13 +33,16 @@ export function buildRequest(peerId: string, chatId: string, clientIds: string[]
  */
 export async function buildResponse(requesterId: string, chatId: string, clientIds: string[]): Promise<RecoverResp> {
     const {store} = await ensureProvisioned();
-    const items: Array<{mid: string; text: string}> = [];
+    const have: Array<{mid: string; text: string}> = [];
+    const missing: string[] = [];
     for (const clientId of clientIds.slice(0, MAX_RECOVER_BATCH)) {
         const plain = await loadPlaintext(clientId, E2EE_PLAINTEXT_TTL_MS);
-        if (plain != null) items.push({ mid: clientId, text: plain });   // expired / never ours → skipped
+        if (plain != null) have.push({ mid: clientId, text: plain });
+        else missing.push(clientId);                                    // expired past 48h, or we never held it → NACK
     }
-    const ciphers = items.length ? await encryptRecovery(store, requesterId, chatId, items) : [];
-    return { type: RECOVER_RESP, to: requesterId, conversationId: chatId, items: ciphers };
+    const ciphers = have.length ? await encryptRecovery(store, requesterId, chatId, have) : [];
+    logger.info("e2ee recovery: responding", {requesterId, chatId, recover: ciphers.length, missing: missing.length});
+    return { type: RECOVER_RESP, to: requesterId, conversationId: chatId, items: ciphers, missing };
 }
 
 /** Requester side: decrypt each recovered item on the recovery session, verifying its binding to chatId. */
