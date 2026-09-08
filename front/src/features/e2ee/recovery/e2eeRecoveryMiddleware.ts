@@ -106,22 +106,34 @@ export const e2eeRecoveryMiddleware: Middleware = (store) => {
                         const missing = Array.isArray(f.missing) ? f.missing : [];
                         const pend = await allPending();
                         const byClient = new Map(pend.map((p) => [p.clientId, p]));
+                        // A response may only touch pending items we actually requested FROM this responder,
+                        // for THIS chat. clientIds aren't secret and ride the frames, so without this a third
+                        // party could forge a `missing` NACK and force a still-recoverable message to "lost".
+                        // The recovered path is already crypto-authenticated (decryptRecovery binds sender +
+                        // chat + id); this guards the NACK path, which carries no such proof, symmetrically.
+                        const mine = (p?: PendingItem): p is PendingItem => !!p && p.peerId === f.from && p.chatId === f.conversationId;
+                        const done = new Set<string>();
                         for (const {forClientId, plaintext} of recovered) {
                             const p = byClient.get(forClientId);
-                            if (!p) continue;
+                            if (!mine(p)) continue;
                             await savePlaintext(p.serverId, p.chatId, plaintext);
                             patchRow(p.chatId, p.serverId, plaintext);
                             await removePending(forClientId);
+                            done.add(forClientId);
                         }
                         // Definitive NACK from the sender: it sent these but no longer holds them (past the 48h
-                        // window) or never did — mark lost NOW instead of waiting out the retry budget.
+                        // window) or never did — mark lost NOW instead of waiting out the retry budget. Never
+                        // clobber a message the same response just recovered (id in both lists).
+                        let lost = 0;
                         for (const mid of missing) {
+                            if (done.has(mid)) continue;
                             const p = byClient.get(mid);
-                            if (!p) continue;
+                            if (!mine(p)) continue;
                             patchRow(p.chatId, p.serverId, i18n.t(secretStateKey("lost")));
                             await removePending(mid);
+                            lost++;
                         }
-                        logger.info("e2ee recovery: applied", {recovered: recovered.length, lost: missing.length, items: f.items!.length});
+                        logger.info("e2ee recovery: applied", {recovered: done.size, lost, items: f.items!.length});
                     } catch (e) { logger.warn("e2ee recovery: apply failed", e as Error); }
                 })();
                 return result;
