@@ -8,7 +8,7 @@ const loadPlaintext = vi.fn();
 vi.mock("../../lib/atRest.ts", () => ({loadPlaintext: (...a: unknown[]) => loadPlaintext(...a), E2EE_PLAINTEXT_TTL_MS: 172_800_000}));
 const encryptRecovery = vi.fn(async (_s: unknown, _u: string, _c: string, items: Array<{mid: string; text: string}>) =>
     items.map((it) => ({mid: it.mid, t: 3, b: "cipher:" + it.mid})));
-vi.mock("../../lib/secretSession.ts", () => ({encryptRecovery: (...a: never[]) => encryptRecovery(...a)}));
+vi.mock("../../lib/secretSession.ts", () => ({encryptRecovery: (...a: Parameters<typeof encryptRecovery>) => encryptRecovery(...a)}));
 
 import {buildResponse, RECOVER_RESP} from "../protocol.ts";
 
